@@ -80,7 +80,7 @@ const LIBRARY = {
           short: "Pastiche",
           def: "The narrator temporarily adopting the prose register of an in-world document type while remaining the chapter's narrator.",
           quote: '"She\'d staked their claim to the world\'s influence and resources by driving technology… nice lucrative slices carved off it."',
-          effect: "The narrator dons corporate-press-release vocabulary before quietly subverting it. The predatory reality leaks through the flattering language — same technique as the Jarokir epigraph in HoOW."
+          effect: "The narrator dons corporate-press-release vocabulary before quietly subverting it. The predatory reality leaks through the flattering language — same technique as the Jarokir epigraph in House of Open Wounds."
         },
         {
           term: "Metonymy",
@@ -303,14 +303,6 @@ const LIBRARY = {
           effect: "The dying are named by the mark on their foreheads, which is named by the flask that produced it. A nickname doing institutional work — synecdoche compresses a whole moral and bureaucratic situation into a phrase."
         },
         {
-          term: "Eponym",
-          category: "Substitution",
-          short: "Eponym",
-          def: "A word derived from a person's name.",
-          quote: "Note: HoOW does not feature prominent eponyms — the Palleseen project of stripping personal-name vocabulary from technical fields is itself a worldview the prose enacts.",
-          effect: "The absence of eponyms is meaningful. The empire prefers Latinate institutional coinages precisely because eponyms would smuggle individual personhood into vocabulary the empire wants to keep impersonal."
-        },
-        {
           term: "Neologism",
           category: "Coinage",
           short: "Neologism",
@@ -319,20 +311,12 @@ const LIBRARY = {
           effect: "Tchaikovsky never glossarizes; the world teaches its own vocabulary. The reader assembles meaning from use and context, which creates the feeling of actually learning a new language."
         },
         {
-          term: "Portmanteau",
-          category: "Coinage",
-          short: "Portmanteau",
-          def: "A coinage formed by mashing two words together.",
-          quote: "HoOW uses portmanteaus mainly for technical/military vocabulary embedded in the world.",
-          effect: "When portmanteaus appear, they tend to be transparent enough that the reader doesn't notice the coinage — they read as established vocabulary inside the world."
-        },
-        {
           term: "Loanword",
           category: "Coinage",
           short: "Loanword",
           def: "A word borrowed wholesale from another language without translation.",
           quote: "Tablethi reads as a borrowed plural form. Surrounding Alv, the Divinati guest-adjutant, whose foreignness is marked partly by her vocabulary entering the prose around her.",
-          effect: "HoOW uses pseudo-loanwords from invented languages. The technique creates linguistic depth without requiring full conlang construction."
+          effect: "House of Open Wounds uses pseudo-loanwords from invented languages. The technique creates linguistic depth without requiring full conlang construction."
         },
         {
           term: "Catachresis",
@@ -1315,17 +1299,16 @@ function TermCard({ term }) {
    List View Row (used in Definitions tab)
 ───────────────────────────────────────────── */
 function ListRow({ term, selected, onToggle }) {
-  const [open, setOpen] = useState(false);
   const meta = getCategoryMeta(term.category);
   const multi = term.examples.length > 1;
   const isSelected = selected && selected.has(term.term);
 
   return (
     <div className="list-row" style={{ outline: isSelected ? `2px solid ${meta.color}` : '2px solid transparent', transition: 'outline 0.15s' }}>
-      <div className="list-row-header" style={{ gap: 10 }}>
-        {/* Checkbox */}
+      {/* Header row: checkbox · term name · category pill */}
+      <div className="list-row-header" style={{ gap: 10, cursor: 'default' }}>
         {onToggle && (
-          <div onClick={e => { e.stopPropagation(); onToggle(term.term); }}
+          <div onClick={() => onToggle(term.term)}
             style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0, cursor: 'pointer',
               background: isSelected ? meta.color : '#fff8ee',
               border: `2px solid ${isSelected ? meta.color : '#c4a87a'}`,
@@ -1333,40 +1316,34 @@ function ListRow({ term, selected, onToggle }) {
             {isSelected && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
           </div>
         )}
-        <div style={{ flex: 1, minWidth: 0 }} onClick={() => setOpen(o => !o)}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
             <span style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 15, color: '#2c1f0e' }}>{term.term}</span>
             {multi && <span style={{ fontSize: 11, color: '#9a8a70', fontFamily: "'DM Sans',sans-serif" }}>{term.examples.length} examples</span>}
           </div>
-          <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: '#5a4a36', lineHeight: 1.4, whiteSpace: open ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {term.def}
-          </div>
         </div>
-        <div onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-          <CategoryPill cat={term.category} small />
-          <span style={{ color: '#9a8a70', fontSize: 16, flexShrink: 0, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>›</span>
+        <CategoryPill cat={term.category} small />
+      </div>
+
+      {/* Always-visible body: definition + quote(s) + effect(s) */}
+      <div className="list-row-body">
+        <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: '#3a2c1a', lineHeight: 1.6, marginBottom: 12 }}>
+          {term.def}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {term.examples.map((ex, i) => (
+            <div key={i} style={{ borderLeft: `3px solid ${meta.color}`, paddingLeft: 12 }}>
+              {multi && <div style={{ marginBottom: 4 }}><SourceTag book={ex.book} chapter={ex.chapter} /></div>}
+              <div style={{ fontFamily: "'Lora',serif", fontStyle: 'italic', fontSize: 14, lineHeight: 1.7, color: '#3a2c1a', marginBottom: 6 }}>
+                {ex.quote}
+              </div>
+              <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: '#5a4a36', lineHeight: 1.5 }}>
+                {ex.effect}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-      {open && (
-        <div className="list-row-body">
-          <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: '#3a2c1a', lineHeight: 1.6, marginBottom: 12 }}>
-            {term.def}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {term.examples.map((ex, i) => (
-              <div key={i} style={{ borderLeft: `3px solid ${meta.color}`, paddingLeft: 12 }}>
-                {multi && <div style={{ marginBottom: 4 }}><SourceTag book={ex.book} chapter={ex.chapter} /></div>}
-                <div style={{ fontFamily: "'Lora',serif", fontStyle: 'italic', fontSize: 14, lineHeight: 1.7, color: '#3a2c1a', marginBottom: 6 }}>
-                  {ex.quote}
-                </div>
-                <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: '#5a4a36', lineHeight: 1.5 }}>
-                  {ex.effect}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
