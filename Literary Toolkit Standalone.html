@@ -1359,36 +1359,94 @@ function FlipCard({ front, back, frontBg, backBg, height }) {
 function FlashcardsTab({ terms, selected, isMobile }) {
   const { cardHeight } = useContext(TweakCtx);
 
-  const deck = useMemo(() => {
+  // Build full deck (shuffled) whenever terms/selection changes.
+  // Each card gets a stable id so we can track it across reshuffles.
+  const fullDeck = useMemo(() => {
     const filtered = terms.filter(t => selected.has(t.term));
     const cards = [];
     filtered.forEach(t => {
       const meta = getCategoryMeta(t.category);
-      // Term card
-      cards.push({ type: 'term', term: t, meta });
-      // One quote card per example
-      t.examples.forEach(ex => {
-        cards.push({ type: 'quote', term: t, ex, meta });
+      cards.push({ type: 'term', term: t, meta, id: `t:${t.term}` });
+      t.examples.forEach((ex, ei) => {
+        cards.push({ type: 'quote', term: t, ex, meta, id: `q:${t.term}:${ei}` });
       });
     });
     return shuffle(cards);
   }, [terms, selected]);
 
-  const [idx, setIdx] = useState(0);
-  const [key, setKey] = useState(0); // force re-mount on nav to reset flip
+  // Fast id→card lookup
+  const cardMap = useMemo(() => {
+    const m = {};
+    fullDeck.forEach(c => { m[c.id] = c; });
+    return m;
+  }, [fullDeck]);
 
-  useEffect(() => { setIdx(0); setKey(k => k+1); }, [deck]);
+  const [learned, setLearned]     = useState(new Set());
+  const [activeIds, setActiveIds] = useState([]);
+  const [idx, setIdx]             = useState(0);
+  const [flipKey, setFlipKey]     = useState(0); // remounts FlipCard to reset flip state
 
-  if (deck.length === 0) return (
+  // Sync when fullDeck changes (new selection chosen)
+  useEffect(() => {
+    setLearned(new Set());
+    setActiveIds(fullDeck.map(c => c.id));
+    setIdx(0);
+    setFlipKey(k => k + 1);
+  }, [fullDeck]);
+
+  const activeDeck = activeIds.map(id => cardMap[id]).filter(Boolean);
+
+  function goTo(n) { setIdx(n); setFlipKey(k => k + 1); }
+
+  function doShuffle() {
+    setActiveIds(ids => shuffle([...ids]));
+    setIdx(0);
+    setFlipKey(k => k + 1);
+  }
+
+  function markLearned() {
+    const id = activeIds[idx];
+    const newIds = activeIds.filter(x => x !== id);
+    setLearned(s => new Set([...s, id]));
+    setActiveIds(newIds);
+    // stay at same index position (next card slides in), clamp at end
+    setIdx(i => Math.min(i, Math.max(0, newIds.length - 1)));
+    setFlipKey(k => k + 1);
+  }
+
+  function resetAll() {
+    setLearned(new Set());
+    setActiveIds(shuffle(fullDeck.map(c => c.id)));
+    setIdx(0);
+    setFlipKey(k => k + 1);
+  }
+
+  if (fullDeck.length === 0) return (
     <div style={{ textAlign: 'center', padding: '60px 0', color: '#9a8a70', fontFamily: "'Lora',serif", fontStyle: 'italic' }}>
       No terms selected. Go to Definitions and select some terms.
     </div>
   );
 
-  const card = deck[idx];
-  const h = Math.max(cardHeight, 280);
+  // ── Completion screen ──
+  if (activeDeck.length === 0) return (
+    <div style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center', padding: '52px 0' }}>
+      <div style={{ fontSize: 44, marginBottom: 14 }}>🎉</div>
+      <div style={{ fontFamily: "'Lora',serif", fontSize: 22, fontWeight: 600, color: '#2c1f0e', marginBottom: 8 }}>
+        You've learned all {learned.size} card{learned.size !== 1 ? 's' : ''}!
+      </div>
+      <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 14, color: '#5a4a36', lineHeight: 1.6, marginBottom: 28 }}>
+        {terms.filter(t => selected.has(t.term)).length} terms covered.
+      </div>
+      <button onClick={resetAll} style={{
+        fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 600,
+        padding: '12px 28px', borderRadius: 8, border: 'none',
+        background: '#2c1f0e', color: '#faf6ee', cursor: 'pointer',
+      }}>Reset &amp; reshuffle</button>
+    </div>
+  );
 
-  function goTo(n) { setIdx(n); setKey(k => k+1); }
+  const card = activeDeck[idx];
+  const h = Math.max(cardHeight, 280);
 
   let front, back, frontBg, backBg;
   const meta = card.meta;
@@ -1445,39 +1503,61 @@ function FlashcardsTab({ terms, selected, isMobile }) {
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto' }}>
+
       {/* Info banner */}
       <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: '#9a8a70', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <span>{deck.length} cards · {terms.filter(t=>selected.has(t.term)).length} terms selected in Definitions</span>
-        <span style={{ color: '#d4871a' }}>Tip: select terms in Definitions to filter these cards</span>
+        <span>
+          {activeDeck.length} remaining
+          {learned.size > 0 && <span style={{ color: '#5a9e4e', fontWeight: 600 }}> · {learned.size} learned ✓</span>}
+        </span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {learned.size > 0 && (
+            <button onClick={resetAll} style={{
+              fontFamily: "'DM Sans',sans-serif", fontSize: 11, padding: '3px 10px', borderRadius: 20,
+              border: '1.5px solid #d4c9b0', background: 'transparent', color: '#9a8a70', cursor: 'pointer',
+            }}>Reset all</button>
+          )}
+          <button onClick={doShuffle} style={{
+            fontFamily: "'DM Sans',sans-serif", fontSize: 11, fontWeight: 600, padding: '3px 12px', borderRadius: 20,
+            border: '1.5px solid #d4871a', background: '#fef3e2', color: '#d4871a', cursor: 'pointer',
+          }}>⇄ Shuffle</button>
+        </div>
       </div>
 
-      {/* Progress */}
+      {/* Progress bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <div style={{ flex: 1, height: 4, background: '#e8dfc8', borderRadius: 2, overflow: 'hidden' }}>
-          <div style={{ height: '100%', background: '#d4871a', borderRadius: 2, width: `${((idx+1)/deck.length)*100}%`, transition: 'width 0.3s' }}></div>
+          <div style={{ height: '100%', background: '#d4871a', borderRadius: 2, width: `${((idx+1)/activeDeck.length)*100}%`, transition: 'width 0.3s' }}></div>
         </div>
-        <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: '#9a8a70', whiteSpace: 'nowrap' }}>{idx+1} / {deck.length}</span>
+        <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: '#9a8a70', whiteSpace: 'nowrap' }}>{idx+1} / {activeDeck.length}</span>
       </div>
 
       {/* Card */}
-      <FlipCard key={key} front={front} back={back} frontBg={frontBg} backBg={backBg} height={h} />
+      <FlipCard key={flipKey} front={front} back={back} frontBg={frontBg} backBg={backBg} height={h} />
 
       {/* Nav */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, gap: 8 }}>
         <button onClick={() => goTo(Math.max(0, idx-1))} disabled={idx === 0}
-          style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 600, padding: '10px 24px', borderRadius: 6, border: '1.5px solid #d4c9b0', background: 'transparent', color: idx === 0 ? '#d4c9b0' : '#2c1f0e', cursor: idx === 0 ? 'default' : 'pointer' }}>
+          style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 600, padding: '10px 20px', borderRadius: 6, border: '1.5px solid #d4c9b0', background: 'transparent', color: idx === 0 ? '#d4c9b0' : '#2c1f0e', cursor: idx === 0 ? 'default' : 'pointer' }}>
           ← Prev
         </button>
         <div style={{ display: 'flex', gap: 4 }}>
-          {deck.map((c, i) => (
+          {activeDeck.map((c, i) => (
             <div key={i} onClick={() => goTo(i)} style={{ width: i === idx ? 20 : 8, height: 8, borderRadius: 4, background: i === idx ? '#d4871a' : '#e8dfc8', cursor: 'pointer', transition: 'all 0.2s' }}></div>
           )).slice(Math.max(0, idx-3), idx+4)}
         </div>
-        <button onClick={() => goTo(Math.min(deck.length-1, idx+1))} disabled={idx === deck.length-1}
-          style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 600, padding: '10px 24px', borderRadius: 6, border: 'none', background: idx === deck.length-1 ? '#e8dfc8' : '#2c1f0e', color: idx === deck.length-1 ? '#9a8a70' : '#faf6ee', cursor: idx === deck.length-1 ? 'default' : 'pointer' }}>
-          Next →
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={markLearned} title="Mark as learned and move on"
+            style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, padding: '10px 14px', borderRadius: 6, border: '1.5px solid #5a9e4e', background: '#e8f4e0', color: '#2a5a1e', cursor: 'pointer' }}>
+            ✓ Got it
+          </button>
+          <button onClick={() => goTo(Math.min(activeDeck.length-1, idx+1))} disabled={idx === activeDeck.length-1}
+            style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 600, padding: '10px 20px', borderRadius: 6, border: 'none', background: idx === activeDeck.length-1 ? '#e8dfc8' : '#2c1f0e', color: idx === activeDeck.length-1 ? '#9a8a70' : '#faf6ee', cursor: idx === activeDeck.length-1 ? 'default' : 'pointer' }}>
+            Next →
+          </button>
+        </div>
       </div>
+
     </div>
   );
 }
