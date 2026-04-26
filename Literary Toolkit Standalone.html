@@ -1157,8 +1157,15 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 const BOOK_KEYS = {
-  "Children of Strife":   "CoS",
-  "House of Open Wounds": "HoOW",
+  "Children of Strife":              "CoS",
+  "House of Open Wounds":            "HoOW",
+  "A Knight of the Seven Kingdoms":  "AKotSK",
+};
+
+// Author → ordered book list for the chapter-selector UI
+const AUTHOR_BOOKS = {
+  "Adrian Tchaikovsky":  ["Children of Strife", "House of Open Wounds"],
+  "George R.R. Martin":  ["A Knight of the Seven Kingdoms"],
 };
 
 const TweakCtx = createContext(TWEAK_DEFAULTS);
@@ -1719,8 +1726,9 @@ function QuizTab({ terms, selected, onStartQuiz }) {
   }
 
   function restartMissed() {
-    const missedTerms = [...new Set(missed.map(q => q.term))];
-    setDeck(buildQuizDeck(missedTerms));
+    // Re-use the exact missed question objects (already have choices built in),
+    // just reshuffled. This guarantees only the questions you got wrong come back.
+    setDeck(shuffle([...missed]));
     setQi(0); setChosen(null); setScore(0); setDone(false); setMissed([]);
   }
 
@@ -1748,9 +1756,9 @@ function QuizTab({ terms, selected, onStartQuiz }) {
           </div>
         )}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-          {missedTerms.length >= 4 && (
+          {missed.length > 0 && (
             <button onClick={restartMissed} style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 600, padding: '10px 20px', borderRadius: 6, background: '#fef3e2', border: '1.5px solid #d4871a', color: '#a05e0a', cursor: 'pointer' }}>
-              Re-quiz missed ({missedTerms.length})
+              Re-quiz missed ({missed.length} question{missed.length !== 1 ? 's' : ''})
             </button>
           )}
           <button onClick={() => setPhase('select')} style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 600, padding: '10px 20px', borderRadius: 6, background: '#2c1f0e', border: 'none', color: '#faf6ee', cursor: 'pointer' }}>
@@ -1901,7 +1909,8 @@ function Selector({ onStart, canFs, inIframe, toggleFs, isFs, isMobile }) {
     for (const [k, val] of Object.entries(checked)) {
       if (!val) continue;
       const [book, chapter] = k.split('||');
-      selections.push({ book, chapter, data: LIBRARY[book][chapter] });
+      const data = LIBRARY[book] && LIBRARY[book][chapter];
+      if (data) selections.push({ book, chapter, data });
     }
     if (selections.length) onStart(selections);
   }
@@ -1928,41 +1937,50 @@ function Selector({ onStart, canFs, inIframe, toggleFs, isFs, isMobile }) {
 
         <div style={{ marginBottom: 28, textAlign: 'center' }}>
           <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600, color: '#9a8a70', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Literary Toolkit</div>
-          <div style={{ fontFamily: "'Lora',serif", fontSize: isMobile ? 24 : 30, fontWeight: 600, color: '#2c1f0e', marginBottom: 8 }}>Tchaikovsky's Techniques</div>
+          <div style={{ fontFamily: "'Lora',serif", fontSize: isMobile ? 24 : 30, fontWeight: 600, color: '#2c1f0e', marginBottom: 8 }}>Literary Techniques</div>
           <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: isMobile ? 14 : 15, color: '#5a4a36', lineHeight: 1.6 }}>
             Select one or more chapters to study. Chapters are labelled with spoiler levels so you can avoid reading ahead.
           </div>
         </div>
 
-        {Object.entries(LIBRARY).map(([book, chapters]) => (
-          <div key={book} style={{ marginBottom: 24 }}>
-            <div style={{ fontFamily: "'Lora',serif", fontStyle: 'italic', fontSize: 18, fontWeight: 600, color: '#2c1f0e', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #e8dfc8' }}>
-              {book}
+        {Object.entries(AUTHOR_BOOKS).map(([author, bookList]) => (
+          <div key={author} style={{ marginBottom: 28 }}>
+            {/* Author heading */}
+            <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, fontWeight: 600, color: '#9a8a70', textTransform: 'uppercase', letterSpacing: '0.10em', marginBottom: 14 }}>
+              {author}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {Object.entries(chapters).map(([chapter, data]) => {
-                const sp = SPOILER_LABEL[data.spoilerLevel] || SPOILER_LABEL['early-book'];
-                const active = isChecked(book, chapter);
-                return (
-                  <div key={chapter} onClick={() => toggle(book, chapter)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: isMobile ? '12px 14px' : '14px 18px',
-                      background: active ? '#fff0d8' : '#fff8ee',
-                      border: `1.5px solid ${active ? '#d4871a' : '#d4c9b0'}`,
-                      borderRadius: 8, cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s' }}>
-                    <div className={`ch-box${active ? ' checked' : ''}`}>
-                      {active && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: isMobile ? 14 : 15, fontWeight: 500, color: '#2c1f0e', marginBottom: 2 }}>{chapter}</div>
-                      <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: '#9a8a70' }}>{data.terms.length} terms</div>
-                    </div>
-                    <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: sp.bg, color: sp.color, border: `1px solid ${sp.color}44`, whiteSpace: 'nowrap' }}>
-                      ⚠ {sp.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            {bookList.filter(book => LIBRARY[book]).map(book => (
+              <div key={book} style={{ marginBottom: 14 }}>
+                {/* Book heading */}
+                <div style={{ fontFamily: "'Lora',serif", fontStyle: 'italic', fontSize: 17, fontWeight: 600, color: '#2c1f0e', marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid #e8dfc8' }}>
+                  {book}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {Object.entries(LIBRARY[book]).map(([chapter, data]) => {
+                    const sp = SPOILER_LABEL[data.spoilerLevel] || SPOILER_LABEL['early-book'];
+                    const active = isChecked(book, chapter);
+                    return (
+                      <div key={chapter} onClick={() => toggle(book, chapter)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 14, padding: isMobile ? '12px 14px' : '14px 18px',
+                          background: active ? '#fff0d8' : '#fff8ee',
+                          border: `1.5px solid ${active ? '#d4871a' : '#d4c9b0'}`,
+                          borderRadius: 8, cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s' }}>
+                        <div className={`ch-box${active ? ' checked' : ''}`}>
+                          {active && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: isMobile ? 14 : 15, fontWeight: 500, color: '#2c1f0e', marginBottom: 2 }}>{chapter}</div>
+                          <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: '#9a8a70' }}>{data.terms.length} terms</div>
+                        </div>
+                        <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: sp.bg, color: sp.color, border: `1px solid ${sp.color}44`, whiteSpace: 'nowrap' }}>
+                          ⚠ {sp.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         ))}
 
